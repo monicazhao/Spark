@@ -90,6 +90,7 @@ textFile.map(lambda s: len(s)).reduce(lambda a, b : a + b)
 批处理方式，每次处理10个元素；
 3）	序列文件（SequenceFile）以及Hadoop输入/输出格式。
 写支持
+![Alt Text](https://github.com/monicazhao/Spark/tree/master/Translation/writtable type.jpg)
 PySpark序列化文件支持在Java中加载键-值对形式的RDD对象，并将可写类型转换为基本的Java类型，然后使用Pyrolite序列化得到的Java对象。如果要将
 键-值对形式的RDD对象保存为序列文件，则PySpark进行相反的操作：首先将Python对象反序列化为Java对象，然后将其转变为可写类型。下面的可写类型
 都是自动进行转换的：
