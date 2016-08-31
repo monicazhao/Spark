@@ -1,1 +1,164 @@
+2016年8月末记
 
+常看到很多招聘信息，做大数据的都要求掌握分布式，包括Hadoop、Spark等等。小女子不才，java代码虽写过3年有余，但是相比身边的其他工程师而言，
+觉得自己简直就是小学生。因为研究生期间专攻数据挖掘，毕业后也一直断断续续地在公司做了几个与统计学、文本分析和图像识别有关的项目，因此将
+自己定位成算法工程师或者数据分析师。做好数据分析师的重要一步就是学习掌握主流的分布式和大数据计算平台，所以立志开始认认真真的学习Spark，
+给自己准备嫁妆。
+
+2016.08.31
+
+第一部分 快速介绍
+Spark的交互式shell：Spark的shell是一个强大的交互式数据分析工具，提供了一个简单的方式来学习Spark API。
+运行spark shell：./bin/pyspark
+Spark最主要的抽象是一个名为RDD（弹性分布式数据库）的分布式数据集合，RDD可以基于Hadoop的InputFormats创建，也可以由其它RDD转换得到。
+RDD提供了两种类型的操作，一种名为actions，用于从RDD中返回值；一种名为transformations，用于创建新的RDD并返回对它的引用。
+RDD的actions和transformations操作可以应用在更加复杂的运算中。
+Hadoop流行的一个通用的数据流模式是MapReduce，Spark能够轻松的实现MapReduce。
+Spark能够将数据存放在集群的内存缓存中，对于需要重复访问的数据而言，这至关重要。
+独立应用程序（self-contained application）。
+注意几个比较特殊的脚本：spark-submit，run-example等。
+
+第二部分 概述
+从整体上讲，每个spark应用程序（spark application）都包含一个驱动程序（driver application），该驱动程序用于运行用户的main函数，并在集群上
+执行多种并行操作。Spark提供的第一个抽象概念就是RDD（resilient distributed dataset）弹性分布式数据库，它是一个可分区的数据元素集合，这些
+元素分布在集群的各个节点，可用于执行分布式并行操作。RDD的创建方式有多种，可以用Hadoop文件系统中的文件创建，也可以通过对驱动程序中已经存在
+的scala集合进行转换得到。用户可以请求Spark将RDD持久化到内存空间，以便它能够在并行操作中重复使用。最后，RDD可以自动从节点失败中恢复数据。
+
+Spark提供的第二个抽象概念是共享变量（shared variables），共享变量是在并行操作中使用的变量。通常情况下，当Spark将不同的任务分发到不同的结
+点时，会连同函数的数据副本和代码一起发送给结点。有时，一个变量需要在多个任务之间共享，有时需要在任务和驱动程序之间共享。Spark支持两种类
+型的共享变量：1）广播变量（broadcast variables），在所有结点的内存中缓存数据；2）累加器（accumulators），用来执行跨结点的累加操作。
+
+第三部分 链接Spark
+Spark2.0.0支持python2.6+或python3.4+版本，它可以使用标准的CPython解释器，因此可以使用诸如Numpy这样的C语言库。除此之外，Spark2.0.0也支持
+PyPy2.3+。
+为了在Python中运行Spark应用程序，使用Spark安装路径中的bin/spark-submit脚本，该脚本用于加载Spark的Java/Scala仓库，并允许用户将应用程序提
+交到集群。除此之外，使用bin/pyspark命令可以启动Python的Spark交互式命令行。
+如果用户要访问HDFS数据，则需要编译链接到指定HDFS版本的PySpark。编写Spark应用程序之前，需要将必要的Spark类导入到应用程序中，比如：
+from pyspark import SparkContext, SparkConf
+PySpark要求driver和workers的Python版本一致，默认使用的是环境变量PATH中配置的Python版本。由于可以在Linux上安装多个不同版本的Python，可以
+通过设置PYSPARK_PYTHON环境变量指定使用的Python版本。
+
+第四部分 初始化Spark
+编写Spark应用程序的第一件事就是创建一个SparkConext对象，SparkContext对象负责连接到集群。为了创建SparkContext对象，首先需要创建一个Spark-
+Conf对象，该对象包含了Spark应用程序的基本信息。
+一个JVM只允许激活一个SparkContext对象，在创建新的SparkContext对象之前，必须使用stop()方法停止已经激活的SparkContext对象。
+conf = SparkConf().setAppName(appName).setMaster(master)
+sc = SparkContext(conf = conf)
+说明：appName是Spark应用程序的名称，显示在集群界面上；master是需要提交到的集群的URL地址，其中master = “local”表示提交到本地集群。实际上，
+在集群中运行Spark应用程序时，是不需要将master硬编码到应用程序，仅需调用spark-submit。在本地测试和单元测试中，传入“local”值用于测试操作。
+
+使用Spark交互式Shell
+在PySpark的交互式shell中，已经事先创建好一个SparkContext，其变量名称为sc。在使用stop()方法停止该SparkContext对象之前，用户无法创建自己的
+SparkContext对象。使用—master参数可以设置SparkContext对象连接到的主节点；使用—py-files可以将以逗号分隔的Python .zip、.egg或者.py文件添加
+到运行时路径；使用—packages选项可以将Spark的依赖包添加到shell进程中；其它必要的依赖包可以使用—repositories选项添加到Spark中。使用Python
+编写Spark应用程序时，Spark依赖的包都必须使用pip关键字手动引入。
+举例：在本地的4个线程运行PySpark的命令      ./bin/pyspark --master local[4]
+
+第五部分 Spark的核心---RDD
+
+第一：并行化集合
+并行化集合通过对驱动程序中已经存在的可迭代序列和集合调用SparkContext对象的parallelize并行化方法创建。集合中的元素被复制以用于建立可执行
+并行操作的分布式数据库。下面展示了如何对1到5之间的数字序列创建并行化集合。
+data = [1,2,3,4,5]
+distData = sc.parallelize(data)
+成功创建之后，分布式数据库distData就可以执行并行操作了。例如，执行distData.reduce(lambda a, b : a + b)用于将列表中的所有元素相加。
+并行集合的一个重要参数就是设置需要将数据集切分成多少分区（partitions），Spark会在集群的每个分区启动一个任务。一般情况下，集群中一个CPU对
+应2-4个分区。通常情况下，Spark会自动根据集群设置分区的数量。用户也可以通过向parallelize方法传入第二个参数来手动设置分区数量，比如sc.para
+llelize(data, 10)。在某些场合，使用slices表示分区数，以保证兼容。
+
+第二：外部数据库
+PySpark允许从Hadoop支持的任何存储源（storage source）创建分布式数据库，这些存储源包括：用户的本地文件系统、HDFS、Cassandra、HBase、Amazon 
+S3等。除此之外，Spark也支持文本文件、序列文件（SequenceFiles）和任何其它类似于Hadoop InputFormat的文件。
+sequenceFile是Hadoop中一个由二进制序列化过的key/value的字节流组成的文本存储文件。
+文本RDD可以通过调用SparkContext对象的textFile方法创建，该方法要求传入文件的URI地址（本地路径或者hdfs路径），然后按行读取，比如：
+textFile = sc.textFile(“data.txt”)
+textFile一旦成功创建就可以执行数据库操作了。比如，使用map和reduce方法可以求得所有行的字符串长度和。
+textFile.map(lambda s: len(s)).reduce(lambda a, b : a + b)
+
+使用Spark读取文件需要注意的几点：
+1）	如果使用本地文件系统中的某个路径，该文件必须在所有工作节点（worker nodes）的相同路径访问到，可以将文件拷贝到所有的工作节点，也可以
+使用网络共享文件系统（network-mounted shared file system）实现；
+2）	Spark所有基于文件的输入方法，包括textFile，都支持对路径、压缩文件和通配符的处理。比如，可以使用textFile(“/my/directory”)，textFile
+(“/my/directory/*.txt”)和textFile(“/my/directory/*.gz”)。
+3）	textFile方法的第二个可选参数用于控制文件的分区数量。通常情况下，Spark会为文件的每一个块（HDFS中，1块为64MB）创建一个分区，但是用户
+可以传入更高的值以设置更多的分区数。需要注意的是，用户传入的分区数量可以比文件的总块数量要少。
+
+除了文本文件之外，Spark提供的Python API也支持许多其他的数据格式：
+1）	SparkContext.wholeTextFiles允许用户读取包含了若干小文本文件的目录，并以（文件名, 内容）的形式返回每个文本文件。这和textFile按行读取
+的方式不同；
+2）	RDD.saveAsPickleFile和SparkContext.pickleFile方法支持将RDD保存为包含持久化（pickled）Python对象的简单格式。在持久序列化的过程中使用
+批处理方式，每次处理10个元素；
+3）	序列文件（SequenceFile）以及Hadoop输入/输出格式。
+写支持
+PySpark序列化文件支持在Java中加载键-值对形式的RDD对象，并将可写类型转换为基本的Java类型，然后使用Pyrolite序列化得到的Java对象。如果要将
+键-值对形式的RDD对象保存为序列文件，则PySpark进行相反的操作：首先将Python对象反序列化为Java对象，然后将其转变为可写类型。下面的可写类型
+都是自动进行转换的：
+ 
+Arrays是无法自动进行处理的，用户在读写Arrays时需要自定义ArrayWritable subtypes，即可写数组子类型。在写的时候，用户需要自定义将arrays转换
+成自定义的可写数组子类型的转换器；在读的时候，默认的转换器会将自定义的可写数组子类型转换为Java数组对象，即：Object[]，该数组对象能够被序
+列化为Python元组。除此之外，为了将Python的array.array转换为原始类型，用户需要自定义转换器。
+1）  保存和装载SequenceFiles
+和文本文件类似，通过指定路径可以保存和装载SequenceFiles，通常情况下需要指定键和值的类，但是对于标准的可写类型而言则是不需要指定的。举例：
+rdd = sc.parallelize(range(1,4)).map(lambda a : (a, “x” * a))
+sc.saveAsSequenceFile(“/home/monica/test”)
+sorted(sc.sequenceFile(“/home/monica/test”).collect())
+2）  保存和装载其它Hadoop输入输出格式
+PySpark能够读写任何Hadoop输入输出格式，同时兼容新老版本的Hadoop MapReduce APIs。如果需要，Hadoop配置信息可以以字典形式传入读写文件的API。
+Elasticsearch是基于Lucene的分布式搜索引擎。
+如果用户有自定义的序列化二进制数据（比如从Cassandra/HBase中装载数据），首先需要将Scala/Java侧的数据转换成能够被Pyrolite序列化处理的形式。
+Spark提供了这样一种转换器特征，用户可以在convert方法中扩展并实现自己的转换代码。需要记住的是，包含有convert方法的类以及用户使用到的所有
+依赖都必须打包进Spark job jar，并在PySpark环境变量中指明路径。
+
+第六部分 RDD操作
+RDD支持两种类型的操作：transformations（转换），用于从已有数据集中创建新的数据集；actions（动作），用于在数据集上执行计算，并将计算得到
+的数值结果返回给驱动程序。比如，map就是一个转换操作，它对数据集中的每个元素执行某个函数操作，并将结果作为一个新的RDD返回；reduce是一个动
+作操作，它基于某个函数聚合RDD中的所有元素，并将最终结果返回给驱动程序。
+Spark中的所有转换操作都是lazy模式的，即它们并不会立即进行计算。相反，它们会记录转换操作及其对应的数据集。只有当用户需要一个动作操作（act
+ion）将结果返回给驱动程序时，这些转换操作才会执行。这种设计使得Spark更高效，比如：当使用map方法创建的一个数据集在后面的reduce方法中需要
+使用时，就可以只将reduce的结果返回给驱动程序，而不是整个大的映射数据集。
+通常情况下，在执行每个action操作时，所有的转换操作都会重新计算。然而，用户仍然可以使用persist方法将RDD持久化到内存，在后续的查询中，速度
+就会提升。Spark同样支持将RDD持久化到磁盘或者复制到集群的多个节点。
+
+1）   基础
+lines = sc.textFile(“/home/monica/spark-2.0.0-bin-hadoop2.7/README.md”)   ---1
+lineLengths = lines.map(lambda s : len(s))               ---2
+totalLength = lineLengths.reduce(lambda a, b : a + b)     ---3
+说明：1 通过读取外部文件创建了一个基本的RDD对象，在没有任何实际操作之前，该文件是不会被加载到内存的，也就是说此时lines只是一个指向外部文
+件的指针；
+2 将map转换操作的结果定义为lineLengths，由于lazy模式，该转换操作是不会被立即执行的；
+3 运行reduce动作操作。此时，Spark会将计算划分多个任务分发到多台机器，每台机器都基于自有数据执行map和reduce操作，并将计算结果返回给驱动程
+序。
+注意：如果要在后续的操作中使用到lineLengths，需要调用persist方法将该操作持久化，如此就将map的计算结果保存在内存中了。
+
+2）    传递函数给Spark（Spark回调函数）
+Spark依赖于传递给驱动程序的、需要在集群上执行的函数，目前有三种将函数传递给Spark的方式：
+1）	lambda表达式：简单函数可以写成lambda表达式，lambda表达式不支持多句函数和没有返回值的函数；
+2）	在本地使用def关键字定义函数，然后在Spark中调用；
+3）	模块中的顶级代码。
+举例：使用def关键字定义一个不能用lambda关键字定义的函数，比如：
+def myfunc(s):
+	words = s.split(“ ”)
+	return len(words)
+textFile = sc.textFile(“/home/monica/spark-2.0.0-bin-hadoop2.7/README.md”)
+textFile.map(myfunc)
+需要说明的是，用户也可以传递类实例中方法的引用（与单例模式相反），此时需要将包含类以及方法的整个对象传递给Spark。
+class MyClass:
+	def func(self, s):
+		words = s.split(“ ”)
+		return len(words)
+	def doStuff(self,rdd):
+		return rdd.map(self.func)
+在上述代码中，创建一个MyClass类的实例，并在该实例上调用doStuff方法，该方法的map函数中的self.func引用了MyClass对象中的方法，所以整个集群都需要传入到集群中。
+与此类似，访问外层对象的数据域也需要传递对整个对象的引用。
+class MyClass:
+	def __init__(self):
+		self.field = “Hello”
+	def doStuff(self, rdd):
+		return rdd.map(lambda s : self.field + s)
+为了避免这个问题，建议构造一个本地变量缓存这个外层数据域，如此就不必从外层进行访问，比如：
+class MyClass:
+	def __init__(self):
+		self.field = “Hello”
+	def doStuff(self, rdd):
+		field = self.field
+		return rdd.map(lambda s : self.field + s)
